@@ -4,8 +4,8 @@
 #include <time.h>
 #include <SDL_phelma.h>
 
-#define DMAX 3000
-#define H 100
+#define DMAX 1.7976931348623158e+308
+#define H 300
 
 typedef unsigned char PIXEL;
 
@@ -13,7 +13,7 @@ struct ppv
 {
 	int x;
 	int y;
-	int d;
+	double d;
 };
 
 typedef struct ppv PPV;
@@ -82,21 +82,20 @@ PPV** alloue_champMP(int nl, int nc)
 
 int estTrou(PIXEL** trous, int i, int j)
 {
-	if(trous[i][j]==255)
+	if(trous[i][j])
 	{
 		return 1;
 	}
 
-	else
-	{
-		return 0;
-	}	
+	return 0;	
 }
 
 int bordsTrous(PIXEL** trous, PIXEL** bords, int nl, int nc)
 {
-	int i, j, dx, dy;
-
+	int i, j, dx, dy, n;
+	n=0;
+	
+	printf("Calcul du calque des bords de trous...");
 	for(i=0; i<nl; i++)
 	{
 		for(j=0; j<nc; j++)
@@ -110,15 +109,23 @@ int bordsTrous(PIXEL** trous, PIXEL** bords, int nl, int nc)
 					for(dy=-1; dy<=1; dy++)
 					{
 						// on évite le cas (dx,dy)==(0,0)
-						if((dx || dy)&&(i+dx<nl)&&(i+dx>0)&&(j+dy<nc)&&(j+dy>0)&&!estTrou(trous, i+dx, j+dy))
+						if((dx || dy)
+						&&(i+dx<nl)&&(i+dx>=0)
+						&&(j+dy<nc)&&(j+dy>=0)
+						&&!estTrou(trous, i+dx, j+dy))
 						{
 							bords[i][j] = 255;
 						}
 					}
 				}
+				
+				if(bords[i][j]) n++;
 			}
 		}
 	}
+	printf("fait\n");
+
+	return n;
 }
 
 double distance(PIXEL** im, PIXEL** trous, int is, int js, int it, int jt, int taillepatch, int nl, int nc)
@@ -134,16 +141,21 @@ double distance(PIXEL** im, PIXEL** trous, int is, int js, int it, int jt, int t
 	for(i=-taillepatch; i<=taillepatch; i++)
 	{
 		for(j=-taillepatch; j<=taillepatch; j++)
-		{
-			if(!estTrou(trous, it+i, jt+j) && !estTrou(trous, is+i, js+j))
+		{	
+			if((it+i<nl)&&(it+i>=0)
+			&&(jt+j<nc)&&(jt+j>=0)
+			&&!estTrou(trous, it+i, jt+j)
+			&&(is+i<nl)&&(is+i>=0)
+			&&(js+j<nc)&&(js+j>=0)
+			&&!estTrou(trous, is+i, js+j))
 			{
 				cv++;
-				d+=pow((im[it+i][jt+j]-im[is+i][js+j]),2);
+				d+=pow(im[it+i][jt+j]-im[is+i][js+j],2);
 			}
 		}
 	}
 
-	if(cv<2)
+	if(!cv)
 	{
 		return DMAX;
 	}
@@ -161,17 +173,16 @@ void initialiseMP (PPV** champ, PIXEL** trous, int nl, int nc)
 	{
 		for(j=0; j<nc; j++)
 		{
+			champ[i][j].x=i;
+			champ[i][j].y=j;
+
 			if(estTrou(trous, i, j))
 			{
-				champ[i][j].x=i;
-				champ[i][j].y=j;
 				champ[i][j].d=DMAX;
 			}
 			
 			else
 			{
-				champ[i][j].x=i;
-				champ[i][j].y=j;
 				champ[i][j].d=0;
 			}
 		}
@@ -183,14 +194,14 @@ void trouvemeilleurMP(PPV** champ, PIXEL**  im, PIXEL** trous, int  is, int  js,
 	int dx, dy, n;
 	PPV p;
 	
-	// étape 1
+	// étape 1 : H calculs de distances sur patch aléatoires -> on garde le patch le plus ressemblant
 	srand(time(NULL));
 
 	for(n=0;n<H;n++)
 	{
 		// tirage de coordonnées aléatoires
-		p.x= rand()%nl;
-		p.y= rand()%nc;
+		p.x = rand()%nl;
+		p.y = rand()%nc;
 
 		p.d=distance(im, trous, is, js, p.x, p.y, taillepatch, nl, nc);
 
@@ -200,7 +211,7 @@ void trouvemeilleurMP(PPV** champ, PIXEL**  im, PIXEL** trous, int  is, int  js,
 		}
 	}
 
-	// étape 2
+	// étape 2 : on regarde les patchs voisins de ceux qui correspondent aux voisins du patch qui nous intéresse
 
 	for(dx=-1; dx<=1; dx++)
 	{
@@ -208,12 +219,16 @@ void trouvemeilleurMP(PPV** champ, PIXEL**  im, PIXEL** trous, int  is, int  js,
 		{
 			// on évite le cas (dx,dy)==(0,0)
 			
-			if(dx || dy)
+			if((dx || dy)
+			&&(is+dy<nl)&&(is+dy>=0) 
+			&&(js+dx<nc)&&(js+dx>=0)
+			&&((champ[is+dy][js+dx].x)-dy<nl)&&((champ[is+dy][js+dx].x)-dy>=0)
+			&&((champ[is+dy][js+dx].y)-dx<nc)&&((champ[is+dy][js+dx].y)-dx>=0))
 			{
-				p.x = champ[is+dx][js+dy].x-dx;
-				p.y = champ[is+dx][js+dy].y-dy;
+				p.x = (champ[is+dy][js+dx].x)-dy;
+				p.y = (champ[is+dy][js+dx].y)-dx;
 
-				p.d=distance(im, trous, is, js, p.x, p.y, taillepatch, nl, nc);
+				p.d = distance(im, trous, is, js, p.x, p.y, taillepatch, nl, nc);
 
 				if(champ[is][js].d >= p.d)
 				{
@@ -235,7 +250,7 @@ void optimiseMP(PPV** champ, PIXEL** im, PIXEL** trous, int nbiter, int taillepa
 		{
 			for(j=0; j<nc; j++)
 			{
-				// si la "distance" n'est pas optimale (nulle) alors on essaye de trouver mieux
+				// si la "distance" n'est pas optimale (optimale équivaut à nulle) alors on essaye de trouver mieux
 				if(champ[i][j].d)
 				{
 					trouvemeilleurMP(champ, im, trous, i,  j, taillepatch, nl, nc);
@@ -245,16 +260,19 @@ void optimiseMP(PPV** champ, PIXEL** im, PIXEL** trous, int nbiter, int taillepa
 	}
 }
 
-unsigned char** inpaint(unsigned char** im, unsigned char** trous, int taillepatch, int nbiter, int nl, int nc)
+PIXEL** inpaint(PIXEL** im, PIXEL** trous, int taillepatch, int nbiter, int nl, int nc)
 {
-	int i, j;
+	int i, j, n;n=0;
 	PPV** champ = alloue_champMP(nl, nc);
-	unsigned char** result = alloue_image(nl, nc);
-	unsigned char** bords = alloue_image(nl, nc);
-
-	initialiseMP(champ, trous, nl, nc);
+	PIXEL** result = alloue_image(nl, nc);
+	PIXEL** bords = alloue_image(nl, nc);
 	
+	printf("Initialisation du tableau MP...");
+	initialiseMP(champ, trous, nl, nc);
+	printf("fait\n");
+
 	// on remplit l'image résultat avec les pixels de l'originale sauf sur les trous
+	printf("Copie des pixels corrects...");
 	for(i=0; i<nl; i++)
 	{
 		for(j=0; j<nc; j++)
@@ -262,12 +280,17 @@ unsigned char** inpaint(unsigned char** im, unsigned char** trous, int taillepat
 			if(!estTrou(trous, i, j))
 			{
 				result[i][j] = im[i][j];
-			}	
+			}
 		}
 	}
+	printf("fait\n");
 
+	
+
+	printf("Réparation...\n");
 	while(bordsTrous(trous, bords, nl, nc))
 	{
+		n++;
 		optimiseMP(champ, im, trous, nbiter, taillepatch, nl, nc);
 
 		// on remplace les pixels des bords de trous par la valeur de celui au centre de leur meilleur patch
@@ -283,64 +306,64 @@ unsigned char** inpaint(unsigned char** im, unsigned char** trous, int taillepat
 				}	
 			}
 		}
-	}
 
+		//ecritureimagepgm(n, bords, nl, nc);
+		//ecritureimagepgm(-n, trous, nl, nc);
+	}
+	
+	printf("Image réparée !\n");
 	return result;
 }
 
-PIXEL** lectureimage(char* fic, int* pnl, int* pnc)
+void imageValide(PIXEL** image, int nl, int nc)
 {
-	FILE* f;
-	int a, nb, i;
-	char s[512];
-	PIXEL** im;
+	int i, j;
+	PIXEL p, min, max;
 
-	if ((f=fopen(fic,"r")) == NULL) return (NULL);
+	p = image[0][0];
+	min = p;
+	max = p;
 
-	fgets(s, 511,f);
-
-	if (strcmp(s,"P5\n")) return(NULL);
-
-	do
+	for(i=0; i<nl; i++)
 	{
-		fgets(s, 511, f);
-	} while (s[0] == '#');
-
-	sscanf(s, "%d %d", pnc, pnl);
-
-	do
-	{
-		fgets(s, 511, f);
-	} while (s[0] == '#');
-
-	sscanf(s, "%d", &a);
-	if (a > 255) return(NULL);
-
-	im = alloue_image(*pnl, *pnc);
-
-	for(i=0; i<*pnl; i++)
-	{
-		fread(im[i], sizeof(PIXEL), *pnc, f);
+		for(j=0; j<nc; j++)
+		{
+			p = image[i][j];
+			
+			if(p>max) max=p;
+			if(p<min) min=p;
+		}
 	}
-
-	if (fclose(f) != 0 ) perror("Une erreur s’est produite à la fermeture");
-
-	return im;
+	
+	printf("min = %d, max = %d\n", min, max);
 }
-
 
 int main(int a, char** b) 
 { 
-	int* pnc;
-	int* pnl;
-	unsigned char** im = lectureimage("cow_img.pgm", pnl, pnc); // Le tableau image
-	
-	SDL_Surface* fenetre=NULL;
-	/* Creation d'une fenetre, couleurs sur 32 bits */
-	fenetre=newfenetregraphique(600,400);
-	/* On place cette image dans la fenetre, en position 10 20
-	Attention : la fenetre doit pouvoir contenir l’image */
-	afficheim8SDL(fenetre,im,*pnc,*pnl,10,20);
-	puts("Taper pour continuer"); getchar();
+	int nc, nl, nctr, nltr;
+	//SDL_Surface* fenetre=NULL;
+	PIXEL** im;
+	PIXEL** trous;
+	PIXEL** result;
+
+	// Lecture des fichiers images, en niveau de gris, sur 8 bits
+	printf("lecture...");
+	im = lectureimage8("trousetcow_img.pgm", &nl, &nc);
+	trous = lectureimage8("trouscow_img.pgm", &nltr, &nctr);
+	printf("fait : im : (%d,%d), trous : (%d,%d)\n", nl, nc, nltr, nctr);
+
+	// Creation d'une fenetre, couleurs sur 32 bits
+	//fenetre=newfenetregraphique(nc, nl);
+
+	result = inpaint(im, trous, 1, 100, nl, nc);
+	// On sauve l’image dans un fichier nommé resultat.pgm 
+	ecritureimagepgm("resultat.pgm", result, nl, nc);
+
+	/*PIXEL** bords = alloue_image(nl, nc);
+	bordsTrous(trous, bords, nl, nc);
+	ecritureimagepgm("bords_trou.pgm", bords, nl, nc);*/
+
+	//afficheim8SDL(fenetre,result,nl,nc,0,0);
+	//puts("Taper pour continuer"); getchar();
 
 }
