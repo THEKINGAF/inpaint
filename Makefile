@@ -13,7 +13,7 @@ SRC = inpaint.c
 OBJS = $(SRC:.c=.o)
 
 
-prog : $(OBJS)
+inpaint : $(OBJS)
 	gcc -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
