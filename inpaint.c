@@ -1,53 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <time.h>
-#include <SDL_phelma.h>
-
-#define DMAX 1.7976931348623158e+308
-#define H 300
-
-typedef unsigned char PIXEL;
-
-struct ppv
-{
-	int x;
-	int y;
-	double d;
-};
-
-typedef struct ppv PPV;
-
-PIXEL** alloue_image(int nl, int nc)
-{
-	int i;
-	PIXEL** p= calloc(nl,sizeof(*p));
-
-	if (p==NULL) 
-	{
-		return NULL;
-	}
-	else 
-	{
-		*p = calloc(nl*nc,sizeof(**p));
-
-		if (*p ==NULL) 
-		{ 
-			free(p); 
-			return NULL; 
-		}
-
-		else
-		{
-			for(i=1; i<nl; i++)
-			{
-				p[i]=p[i-1]+nc;
-			}
-		}
-	}
-
-	return p;
-}
+#include "inpaint.h"
 
 PPV** alloue_champMP(int nl, int nc)
 {
@@ -323,12 +274,12 @@ int main(int argc, char** argv)
 	PIXEL** result;
 
 	// Lecture des fichiers images, en niveau de gris, sur 8 bits
-	printf("lecture...");
-	im = lectureimage8(argv[1], &nl, &nc);
-	trous = lectureimage8(argv[2], &nltr, &nctr);
+	printf("Lecture...");
+	im = lectureimage(argv[1], &nl, &nc);
+	trous = lectureimage(argv[2], &nltr, &nctr);
 	printf("fait : im : (%d,%d), trous : (%d,%d)\n", nl, nc, nltr, nctr);
 
 	result = inpaint(im, trous, 5, 500, nl, nc);
 	// On sauve l’image dans un fichier nommé resultat.pgm 
-	ecritureimagepgm("resultat.pgm", result, nl, nc);
+	ecritureimage("resultat.pgm", result, nl, nc);
 }
