@@ -243,7 +243,7 @@ PIXEL** inpaint(PIXEL** im, PIXEL** trous, int taillepatch, int nbiter, int nl, 
 	while(bordsTrous(trous, bords, nl, nc))
 	{
 		n++;
-		printf("passe n°%d:\n", n);
+		printf("passe n°%d...\n", n);
 
 		optimiseMP(champ, im, trous, nbiter, taillepatch, nl, nc);
 
@@ -279,7 +279,7 @@ int main(int argc, char** argv)
 	trous = lectureimage(argv[2], &nltr, &nctr);
 	printf("fait : im : (%d,%d), trous : (%d,%d)\n", nl, nc, nltr, nctr);
 
-	result = inpaint(im, trous, 5, 500, nl, nc);
+	result = inpaint(im, trous, 1, 100, nl, nc);
 	// On sauve l’image dans un fichier nommé resultat.pgm 
-	ecritureimage("resultat.pgm", result, nl, nc);
+	ecritureimage(argv[3], result, nl, nc);
 }
